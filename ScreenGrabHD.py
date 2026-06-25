@@ -206,7 +206,7 @@ def main():
     cmd = [
         ffmpeg_path, "-y",
         "-f", "dshow", "-i", f"audio={audio_device}",
-        "-f", "gdigrab", "-framerate", "30",
+        "-f", "gdigrab", "-framerate", "24",
         "-offset_x", str(ox), "-offset_y", str(oy),
         "-video_size", f"{vw}x{vh}", "-i", "desktop",
         "-c:v", "libx264", "-preset", "fast", "-crf", "23",
@@ -215,7 +215,6 @@ def main():
         "-movflags", "+faststart",
         output_filename
     ]
-
     print(f"\n🔴 Recording started... Saving to: {output_filename}")
     print("Press 'q' in this terminal to stop.\n")
     try:
