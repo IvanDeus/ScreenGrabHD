@@ -78,15 +78,16 @@ def get_output_filename():
     return filename
 
 class FixedHDRegionSelector:
-    CAPTURE_W = 1280
-    CAPTURE_H = 720
+    def __init__(self, width=1280, height=720):
+        # Set dimensions dynamically based on arguments
+        self.CAPTURE_W = width
+        self.CAPTURE_H = height
 
-    def __init__(self):
         self.root = tk.Tk()
         self.root.attributes('-fullscreen', True)
         self.root.attributes('-alpha', 0.35)
         self.root.configure(bg='black')
-        self.root.title("Drag 1280x720 frame | ENTER = Confirm | ESC = Cancel")
+        self.root.title(f"Drag {self.CAPTURE_W}x{self.CAPTURE_H} frame | ENTER = Confirm | ESC = Cancel")
         self.root.overrideredirect(True)
 
         self.canvas = tk.Canvas(self.root, bg='black', highlightthickness=0, cursor='fleur')
@@ -151,6 +152,22 @@ def main():
     ffmpeg_path = get_ffmpeg_path()
     print(f"Using FFmpeg: {ffmpeg_path}")
 
+    # === Resolution Selection ===
+    print("\n📺 Select Recording Resolution:")
+    print(" [1] HD (1280x720) - Default")
+    print(" [2] Full HD (1920x1080)")
+    
+    while True:
+        res_choice = input("Select resolution [1/2] (default 1): ").strip()
+        if res_choice == '2':
+            capture_w, capture_h = 1920, 1080
+            break
+        elif res_choice in ['1', '']:
+            capture_w, capture_h = 1280, 720
+            break
+        else:
+            print("Invalid selection. Please enter 1 or 2.")
+
     # === Audio Device Selection ===
     devices = get_audio_devices(ffmpeg_path)
     if not devices:
@@ -173,8 +190,8 @@ def main():
             print("Please enter a number.")
 
     # === Region Selection ===
-    print("\n🖥️  Opening region selector... Drag the green frame.")
-    selector = FixedHDRegionSelector()
+    print(f"\n🖥️  Opening region selector for {capture_w}x{capture_h}... Drag the green frame.")
+    selector = FixedHDRegionSelector(width=capture_w, height=capture_h)
     if not selector.result:
         print("Cancelled by user.")
         return
@@ -183,7 +200,6 @@ def main():
     print(f"✅ Selected: {vw}x{vh} at ({ox}, {oy}) | Audio: {audio_device}")
 
     # === Output Filename ===
-    # Determine the next available filename
     output_filename = get_output_filename()
 
     # === FFmpeg Recording ===
