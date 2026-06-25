@@ -3,6 +3,10 @@ import sys
 import tkinter as tk
 from tkinter import ttk, messagebox
 import os
+import configparser
+
+# Define the configuration file path in the same directory as the script
+CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ScreenGrabHD.cnf")
 
 def get_ffmpeg_path():
     """Return ffmpeg path relative to current working directory"""
@@ -156,14 +160,54 @@ class ScreenGrabApp:
         else:
             self.sys_combo.set("Disabled")
             
+        # --- Load previously saved settings ---
+        self.load_settings()
+            
         # Buttons
         btn_frame = tk.Frame(self.root)
         btn_frame.grid(row=7, column=0, pady=30)
         tk.Button(btn_frame, text="Select Region & Record", command=self.start_region_selector, bg="#4CAF50", fg="white", width=20, font=("Segoe UI", 10, "bold")).pack(side="left", padx=10)
         tk.Button(btn_frame, text="Cancel", command=self.root.destroy, width=10, font=("Segoe UI", 10)).pack(side="left", padx=10)
 
+    def load_settings(self):
+        """Load settings from ScreenGrabHD.cnf if it exists."""
+        if os.path.exists(CONFIG_FILE):
+            config = configparser.ConfigParser()
+            config.read(CONFIG_FILE, encoding='utf-8')
+            if 'Settings' in config:
+                s = config['Settings']
+                
+                res = s.get('resolution', fallback=None)
+                if res in ["1280x720", "1920x1080"]:
+                    self.resolution.set(res)
+                    
+                mic = s.get('microphone', fallback=None)
+                if mic and mic in self.devices:
+                    self.mic_combo.set(mic)
+                    
+                sys_aud = s.get('system_audio', fallback=None)
+                if sys_aud and (sys_aud == "Disabled" or sys_aud in self.devices):
+                    self.sys_combo.set(sys_aud)
+
+    def save_settings(self):
+        """Save current settings to ScreenGrabHD.cnf."""
+        config = configparser.ConfigParser()
+        config['Settings'] = {
+            'resolution': self.resolution.get(),
+            'microphone': self.mic_combo.get(),
+            'system_audio': self.sys_combo.get()
+        }
+        try:
+            with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+                config.write(f)
+        except Exception as e:
+            print(f"Failed to save settings: {e}")
+
     def start_region_selector(self):
         """Step 2: Fullscreen Region Selector"""
+        # --- Save settings before proceeding ---
+        self.save_settings()
+        
         res = self.resolution.get()
         w, h = map(int, res.split('x'))
         mic = self.mic_combo.get()
