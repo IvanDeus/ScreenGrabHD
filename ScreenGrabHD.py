@@ -63,6 +63,19 @@ def get_audio_devices(ffmpeg_path):
         messagebox.showerror("Error", f"Failed to list audio devices: {e}")
         sys.exit(1)
 
+def get_output_filename():
+    """Generate a unique output filename by appending _01, _02, etc., if the file already exists."""
+    base_name = "ScreenGrabHD_recording"
+    ext = ".mp4"
+    filename = f"{base_name}{ext}"
+    counter = 1
+    
+    # Check if the file exists, if so, increment the counter
+    while os.path.exists(filename):
+        filename = f"{base_name}_{counter:02d}{ext}"
+        counter += 1
+        
+    return filename
 
 class FixedHDRegionSelector:
     CAPTURE_W = 1280
@@ -169,6 +182,10 @@ def main():
     ox, oy, vw, vh = selector.result
     print(f"✅ Selected: {vw}x{vh} at ({ox}, {oy}) | Audio: {audio_device}")
 
+    # === Output Filename ===
+    # Determine the next available filename
+    output_filename = get_output_filename()
+
     # === FFmpeg Recording ===
     cmd = [
         ffmpeg_path, "-y",
@@ -180,14 +197,15 @@ def main():
         "-pix_fmt", "yuv420p",
         "-c:a", "aac", "-b:a", "128k",
         "-movflags", "+faststart",
-        "ScreenGrabHD_recording.mp4"
+        output_filename
     ]
 
-    print("\n🔴 Recording started... Press 'q' in this terminal to stop.\n")
+    print(f"\n🔴 Recording started... Saving to: {output_filename}")
+    print("Press 'q' in this terminal to stop.\n")
     try:
         process = subprocess.run(cmd, check=False)
         if process.returncode == 0:
-            print(f"\n✅ Recording saved as ScreenGrabHD_recording.mp4")
+            print(f"\n✅ Recording saved as {output_filename}")
         else:
             print(f"\n❌ FFmpeg exited with code {process.returncode}")
     except KeyboardInterrupt:
