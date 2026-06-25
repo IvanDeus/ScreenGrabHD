@@ -142,12 +142,15 @@ class ScreenGrabApp:
         tk.Radiobutton(self.root, text="HD (1280x720)", variable=self.resolution, value="1280x720").grid(row=1, column=0, sticky="w", padx=40)
         tk.Radiobutton(self.root, text="Full HD (1920x1080)", variable=self.resolution, value="1920x1080").grid(row=2, column=0, sticky="w", padx=40)
         
-        # Microphone
+        # Microphone (Added "Disabled" option)
         tk.Label(self.root, text="Microphone Device:", font=("Segoe UI", 10, "bold")).grid(row=3, column=0, sticky="w", padx=20, pady=(15, 5))
-        self.mic_combo = ttk.Combobox(self.root, values=self.devices, state="readonly", width=45)
+        mic_options = ["Disabled"] + self.devices
+        self.mic_combo = ttk.Combobox(self.root, values=mic_options, state="readonly", width=45)
         self.mic_combo.grid(row=4, column=0, padx=20)
         if self.devices:
-            self.mic_combo.current(0)
+            self.mic_combo.set(self.devices[0])
+        else:
+            self.mic_combo.set("Disabled")
             
         # System Audio
         tk.Label(self.root, text="System Audio Device:", font=("Segoe UI", 10, "bold")).grid(row=5, column=0, sticky="w", padx=20, pady=(15, 5))
@@ -182,11 +185,13 @@ class ScreenGrabApp:
                     self.resolution.set(res)
                     
                 mic = s.get('microphone', fallback=None)
-                if mic and mic in self.devices:
+                mic_options = ["Disabled"] + self.devices
+                if mic and mic in mic_options:
                     self.mic_combo.set(mic)
                     
                 sys_aud = s.get('system_audio', fallback=None)
-                if sys_aud and (sys_aud == "Disabled" or sys_aud in self.devices):
+                sys_options = ["Disabled"] + self.devices
+                if sys_aud and sys_aud in sys_options:
                     self.sys_combo.set(sys_aud)
 
     def save_settings(self):
@@ -213,20 +218,23 @@ class ScreenGrabApp:
         mic = self.mic_combo.get()
         sys_audio = self.sys_combo.get()
         
-        if not mic:
-            messagebox.showerror("Error", "Please select a Microphone device.")
-            return
-            
+        # Process "Disabled" states
+        mic_dev = None if mic == "Disabled" else mic
         sys_audio_dev = None if sys_audio == "Disabled" else sys_audio
         
-        if mic == sys_audio_dev:
+        # Validation: Ensure at least one audio source is selected
+        if not mic_dev and not sys_audio_dev:
+            messagebox.showerror("Error", "Both Microphone and System Audio are disabled.\nPlease select at least one audio source.")
+            return
+            
+        if mic_dev and sys_audio_dev and mic_dev == sys_audio_dev:
             messagebox.showerror("Error", "Microphone and System Audio cannot be the same device.")
             return
             
         self.settings = {
             "width": w,
             "height": h,
-            "mic": mic,
+            "mic": mic_dev,
             "sys_audio": sys_audio_dev
         }
         
@@ -316,48 +324,75 @@ class ScreenGrabApp:
         self.output_filename = get_output_filename()
         tk.Label(self.root, text=f"Saving to:\n{self.output_filename}", font=("Segoe UI", 9), wraplength=280).pack(pady=5)
         
-        # Build FFmpeg Command
+        # Build FFmpeg Command Dynamically
         ox, oy, vw, vh = self.region
         mic_device = self.settings["mic"]
         sys_device = self.settings["sys_audio"]
         ffmpeg_path = self.ffmpeg_path
         
-        if sys_device:
-            cmd = [
-                ffmpeg_path, "-y",
-                "-f", "dshow", "-i", f"audio={mic_device}",
-                "-f", "dshow", "-i", f"audio={sys_device}",
-                "-f", "gdigrab", "-framerate", "24",
-                "-offset_x", str(ox), "-offset_y", str(oy),
-                "-video_size", f"{vw}x{vh}", "-i", "desktop",
-                "-filter_complex", "[0:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[a0];[1:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[a1];[a0][a1]amerge=inputs=2[a]",
-                "-map", "2:v", "-map", "[a]",
-                "-c:v", "libx264", "-preset", "fast", "-crf", "23",
-                "-pix_fmt", "yuv420p",
-                "-c:a", "aac", "-b:a", "192k",
-                "-ac", "2",
-                "-movflags", "+faststart",
-                self.output_filename
-            ]
-        else:
-            cmd = [
-                ffmpeg_path, "-y",
-                "-f", "dshow", "-i", f"audio={mic_device}",
-                "-f", "gdigrab", "-framerate", "24",
-                "-offset_x", str(ox), "-offset_y", str(oy),
-                "-video_size", f"{vw}x{vh}", "-i", "desktop",
-                "-map", "1:v", "-map", "0:a",
-                "-c:v", "libx264", "-preset", "fast", "-crf", "23",
-                "-pix_fmt", "yuv420p",
-                "-c:a", "aac", "-b:a", "128k",
-                "-ac", "2",
-                "-movflags", "+faststart",
-                self.output_filename
-            ]
+        cmd = [ffmpeg_path, "-y"]
+        
+        has_mic = bool(mic_device)
+        has_sys = bool(sys_device)
+        
+        # 1. Add Audio Inputs
+        if has_mic:
+            cmd.extend(["-f", "dshow", "-i", f"audio={mic_device}"])
+        if has_sys:
+            cmd.extend(["-f", "dshow", "-i", f"audio={sys_device}"])
+            
+        # 2. Add Video Input
+        cmd.extend([
+            "-f", "gdigrab", "-framerate", "24",
+            "-offset_x", str(ox), "-offset_y", str(oy),
+            "-video_size", f"{vw}x{vh}", "-i", "desktop"
+        ])
+        
+        # 3. Determine Stream Indices for Mapping
+        input_idx = 0
+        mic_idx = -1
+        sys_idx = -1
+        
+        if has_mic:
+            mic_idx = input_idx
+            input_idx += 1
+        if has_sys:
+            sys_idx = input_idx
+            input_idx += 1
+            
+        vid_idx = input_idx
+        
+        # 4. Map Streams & Apply Filters based on enabled devices
+        if has_mic and has_sys:
+            cmd.extend([
+                "-filter_complex", 
+                f"[{mic_idx}:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[a0];"
+                f"[{sys_idx}:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[a1];"
+                f"[a0][a1]amerge=inputs=2[a]",
+                "-map", f"{vid_idx}:v", "-map", "[a]",
+                "-c:a", "aac", "-b:a", "192k"
+            ])
+        elif has_mic:
+            cmd.extend([
+                "-map", f"{vid_idx}:v", "-map", f"{mic_idx}:a",
+                "-c:a", "aac", "-b:a", "128k"
+            ])
+        elif has_sys:
+            cmd.extend([
+                "-map", f"{vid_idx}:v", "-map", f"{sys_idx}:a",
+                "-c:a", "aac", "-b:a", "128k"
+            ])
+            
+        # 5. Video Encoding Settings
+        cmd.extend([
+            "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+            "-pix_fmt", "yuv420p",
+            "-ac", "2",
+            "-movflags", "+faststart",
+            self.output_filename
+        ])
             
         # Start Process
-        # We use CREATE_NO_WINDOW to hide the console, and stdin=subprocess.PIPE 
-        # so we can send the 'q' command later to stop it gracefully.
         creationflags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
             
         self.process = subprocess.Popen(
