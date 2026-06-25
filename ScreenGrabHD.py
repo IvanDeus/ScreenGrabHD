@@ -8,8 +8,7 @@ import os
 def get_ffmpeg_path():
     """Return ffmpeg path relative to current working directory"""
     cwd = os.getcwd()
-    ffmpeg_path = os.path.join(cwd, "ffmpeg-essentials", "bin", "ffmpeg.exe")
-    
+    ffmpeg_path = os.path.join(cwd, "bin", "ffmpeg.exe")    
     if os.path.exists(ffmpeg_path):
         return ffmpeg_path
     # Fallback: try common locations or PATH
@@ -37,7 +36,7 @@ def get_ffmpeg_path():
         "Error", 
         f"ffmpeg.exe not found!\n\n"
         f"Expected location:\n{ffmpeg_path}\n\n"
-        "Please make sure 'ffmpeg-essentials' folder is in the current directory."
+        "Please make sure 'bin' folder is in the current directory."
     )
     sys.exit(1)
 
@@ -47,7 +46,7 @@ def get_audio_devices(ffmpeg_path):
         result = subprocess.run(
             [ffmpeg_path, "-list_devices", "true", "-f", "dshow", "-i", "dummy"],
             capture_output=True, 
-            encoding='utf-8',  # <--- CHANGE THIS: Forces Python to read UTF-8 properly
+            encoding='utf-8', 
             creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
         )
         lines = result.stderr.splitlines()
@@ -181,14 +180,14 @@ def main():
         "-pix_fmt", "yuv420p",
         "-c:a", "aac", "-b:a", "128k",
         "-movflags", "+faststart",
-        "recording.mp4"
+        "ScreenGrabHD_recording.mp4"
     ]
 
     print("\n🔴 Recording started... Press 'q' in this terminal to stop.\n")
     try:
         process = subprocess.run(cmd, check=False)
         if process.returncode == 0:
-            print(f"\n✅ Recording saved as recording.mp4")
+            print(f"\n✅ Recording saved as ScreenGrabHD_recording.mp4")
         else:
             print(f"\n❌ FFmpeg exited with code {process.returncode}")
     except KeyboardInterrupt:
