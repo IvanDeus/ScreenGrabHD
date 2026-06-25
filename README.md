@@ -4,6 +4,6 @@ ScreenGrabHD is a lightweight Windows screen recorder that lets you drag a fixed
 ## Prereq
 - Get [Python 3.14](https://www.python.org/downloads/windows/) for Windows 
 - Get [FFMPEG ffmpeg-git-essentials](https://www.gyan.dev/ffmpeg/builds/) fow Windows AMD64
-- Get [FFMPEG ffmpeg-win-arm64](https://github.com/tordona/ffmpeg-win-arm64/releases for Windows ARM64
+- Get [FFMPEG ffmpeg-win-arm64](https://github.com/tordona/ffmpeg-win-arm64/releases) for Windows ARM64
 
 2026 [ ivan deus ]
