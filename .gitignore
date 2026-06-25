@@ -1,0 +1,6 @@
+__ScreenGrabHD.py
+__pycache__/
+*.wav
+*.log
+*.mp4
+*.cnf
