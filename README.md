@@ -46,7 +46,7 @@ Download the latest version of Python:
 
 ### Download FFmpeg
 
-#### Windows x64 (AMD64)
+#### For Windows x64 (AMD64)
 
 Download:
 
@@ -56,7 +56,7 @@ Recommended package:
 
 `ffmpeg-git-essentials`
 
-#### Windows ARM64
+#### For Windows ARM64
 
 Download:
 
