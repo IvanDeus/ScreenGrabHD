@@ -6,9 +6,14 @@ ScreenGrabHD is a lightweight Windows screen recorder that lets you drag a fixed
 - Get [FFMPEG ffmpeg-git-essentials](https://www.gyan.dev/ffmpeg/builds/) fow Windows AMD64
 - Get [FFMPEG ffmpeg-win-arm64](https://github.com/tordona/ffmpeg-win-arm64/releases) for Windows ARM64
 
+## Set-up
+
+To capture both Windows System audio and Microphone, go to control panel: System - Sound - All sound devices and enable Stereo Mix! 
+
+
 ## Run
 
-Simply click on a py script or run in terminal:
+Simply click on a ScreenGrabHD.py script or run in terminal:
 
 ```
 python ScreenGrabHD.py
