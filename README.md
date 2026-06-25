@@ -8,6 +8,8 @@ ScreenGrabHD is a lightweight Windows screen recorder that lets you drag a fixed
 
 ## Run
 
+Simply click on a py script or run in terminal:
+
 ```
 python ScreenGrabHD.py
 ```
