@@ -70,7 +70,6 @@ def get_output_filename():
     filename = f"{base_name}{ext}"
     counter = 1
     
-    # Check if the file exists, if so, increment the counter
     while os.path.exists(filename):
         filename = f"{base_name}_{counter:02d}{ext}"
         counter += 1
@@ -79,7 +78,6 @@ def get_output_filename():
 
 class FixedHDRegionSelector:
     def __init__(self, width=1280, height=720):
-        # Set dimensions dynamically based on arguments
         self.CAPTURE_W = width
         self.CAPTURE_H = height
 
@@ -178,16 +176,59 @@ def main():
     for i, d in enumerate(devices):
         print(f" [{i}] {d}")
 
+    # Auto-detect System Audio (Stereo Mix, What U Hear, Loopback, VB-Cable, etc.)
+    sys_keywords = ['stereo mix', 'stereomix', 'what u hear', 'loopback', 'cable output', 'virtual-audio-capturer', 'wave out mix']
+    sys_audio_idx = -1
+    for i, d in enumerate(devices):
+        if any(kw in d.lower() for kw in sys_keywords):
+            sys_audio_idx = i
+            break
+
+    if sys_audio_idx != -1:
+        print(f"\n✅ Auto-detected System Audio: [{sys_audio_idx}] {devices[sys_audio_idx]}")
+    else:
+        print("\n⚠️  No common System Audio (Stereo Mix/Loopback) device detected.")
+        print("To record system audio, ensure 'Stereo Mix' is enabled in Windows Sound Settings or use VB-Cable.")
+
+    # 1. Select Microphone
+    mic_device = None
+    mic_idx = -1
     while True:
         try:
-            choice = input(f"\nSelect device [0-{len(devices)-1}]: ").strip()
-            idx = int(choice)
-            if 0 <= idx < len(devices):
-                audio_device = devices[idx]
+            choice = input("\nSelect Microphone device index: ").strip()
+            mic_idx = int(choice)
+            if 0 <= mic_idx < len(devices) and mic_idx != sys_audio_idx:
+                mic_device = devices[mic_idx]
                 break
-            print("Invalid selection.")
+            elif mic_idx == sys_audio_idx:
+                print("You cannot select the System Audio device as your Microphone. Please choose another.")
+            else:
+                print("Invalid selection.")
         except ValueError:
-            print("Please enter a number.")
+            print("Please enter a valid number.")
+
+    # 2. Select System Audio
+    sys_device = None
+    if sys_audio_idx != -1:
+        confirm = input(f"Use auto-detected System Audio [{sys_audio_idx}]? (Y/n): ").strip().lower()
+        if confirm in ['', 'y', 'yes']:
+            sys_device = devices[sys_audio_idx]
+        else:
+            sys_audio_idx = -1 # Reset to prompt for manual selection
+
+    if sys_device is None:
+        while True:
+            try:
+                choice = input(f"\nSelect System Audio device index (or 'skip' to record Mic only): ").strip()
+                if choice.lower() == 'skip':
+                    break
+                sys_idx = int(choice)
+                if 0 <= sys_idx < len(devices) and sys_idx != mic_idx:
+                    sys_device = devices[sys_idx]
+                    break
+                print("Invalid selection or same as microphone.")
+            except ValueError:
+                print("Please enter a valid number or 'skip'.")
 
     # === Region Selection ===
     print(f"\n🖥️  Opening region selector for {capture_w}x{capture_h}... Drag the green frame.")
@@ -197,24 +238,53 @@ def main():
         return
 
     ox, oy, vw, vh = selector.result
-    print(f"✅ Selected: {vw}x{vh} at ({ox}, {oy}) | Audio: {audio_device}")
+    print(f"✅ Selected: {vw}x{vh} at ({ox}, {oy})")
+    print(f"🎤 Mic: {mic_device}")
+    if sys_device:
+        print(f"🔊 System Audio: {sys_device}")
+    else:
+        print("🔇 System Audio: Disabled (Mic only)")
 
     # === Output Filename ===
     output_filename = get_output_filename()
 
     # === FFmpeg Recording ===
-    cmd = [
-        ffmpeg_path, "-y",
-        "-f", "dshow", "-i", f"audio={audio_device}",
-        "-f", "gdigrab", "-framerate", "24",
-        "-offset_x", str(ox), "-offset_y", str(oy),
-        "-video_size", f"{vw}x{vh}", "-i", "desktop",
-        "-c:v", "libx264", "-preset", "fast", "-crf", "23",
-        "-pix_fmt", "yuv420p",
-        "-c:a", "aac", "-b:a", "128k",
-        "-movflags", "+faststart",
-        output_filename
-    ]
+    if sys_device:
+        # Command for Mic + System Audio (merged)
+        # aformat forces both streams to 48kHz Stereo before merging to prevent sample rate mismatch errors.
+        cmd = [
+            ffmpeg_path, "-y",
+            "-f", "dshow", "-i", f"audio={mic_device}",
+            "-f", "dshow", "-i", f"audio={sys_device}",
+            "-f", "gdigrab", "-framerate", "24",
+            "-offset_x", str(ox), "-offset_y", str(oy),
+            "-video_size", f"{vw}x{vh}", "-i", "desktop",
+            "-filter_complex", "[0:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[a0];[1:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[a1];[a0][a1]amerge=inputs=2[a]",
+            "-map", "2:v", "-map", "[a]",
+            "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+            "-pix_fmt", "yuv420p",
+            "-c:a", "aac", "-b:a", "192k",
+            "-ac", "2",
+            "-movflags", "+faststart",
+            output_filename
+        ]
+    else:
+        # Command for Mic only
+        cmd = [
+            ffmpeg_path, "-y",
+            "-f", "dshow", "-i", f"audio={mic_device}",
+            "-f", "gdigrab", "-framerate", "24",
+            "-offset_x", str(ox), "-offset_y", str(oy),
+            "-video_size", f"{vw}x{vh}", "-i", "desktop",
+            "-map", "1:v", "-map", "0:a",
+            "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+            "-pix_fmt", "yuv420p",
+            "-c:a", "aac", "-b:a", "128k",
+            "-ac", "2",
+            "-movflags", "+faststart",
+            output_filename
+        ]
+
     print(f"\n🔴 Recording started... Saving to: {output_filename}")
     print("Press 'q' in this terminal to stop.\n")
     try:
