@@ -10,7 +10,7 @@ ScreenGrabHD is a lightweight Windows screen recorder that lets you drag a fixed
 
 Download and unpack FFMPEG, and put ScreenGrabHD.py script inside FFMPEG directory.
 
-To capture both Windows System audio and Microphone, go to control panel: System - Sound - All sound devices and enable Stereo Mix! 
+To capture both Windows System audio and Microphone, go to control panel: System - Sound - All sound devices and enable **Stereo Mix**.
 
 
 ## Run
